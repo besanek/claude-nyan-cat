@@ -41,6 +41,17 @@ const engineBand = (on: Parameters<Parameters<typeof test>[1]>[1]) =>
     return <Text>engine</Text>
   })
 
+// Starts a session the way the engine would, so the plugin's frame timer runs on a mocked clock.
+const startSession = async ($: Parameters<Parameters<typeof test>[1]>[0], on: Parameters<Parameters<typeof test>[1]>[1]) => {
+  mock.store(on)
+  const clock = mock.clock(on)
+  on('session.start', ($, e) => e)
+  on('command.register', () => ({ value: undefined }))
+  on('ui.blit', () => ({ value: {} }))
+  await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true })
+  return clock
+}
+
 test('/nyan off hides the cat and /nyan on brings it back', async ($, on) => {
   engineBand(on)
   mock.store(on)
@@ -57,15 +68,19 @@ test('/nyan off hides the cat and /nyan on brings it back', async ($, on) => {
   await shown.unmount()
 })
 
-test('/nyan small and big switch the band height', async ($, on) => {
-  mock.store(on)
+test('the band opens a row at a time up to the size /nyan picked', async ($, on) => {
+  const clock = await startSession($, on)
+
   await $.command.run({ command: 'nyan', args: 'small' })
   const small = await $.ui.mount({ plugin: 'nyan-cat', surface: 'terminal', ...band(true) })
+  expect((await small.find({ key: 'nyan' }))?.props).toMatchObject({ rows: 1 })
+  await clock.advance(2000)
   expect((await small.find({ key: 'nyan' }))?.props).toMatchObject({ rows: 4 })
   await small.unmount()
 
   await $.command.run({ command: 'nyan', args: 'big' })
   const big = await $.ui.mount({ plugin: 'nyan-cat', surface: 'terminal', ...band(true) })
+  await clock.advance(2000)
   expect((await big.find({ key: 'nyan' }))?.props).toMatchObject({ rows: 9 })
   await big.unmount()
 })
@@ -77,18 +92,13 @@ test('/nyan with nonsense prints usage', async $ => {
 
 test('when the turn ends the cat flies off, then the band clears', async ($, on) => {
   engineBand(on)
-  mock.store(on)
-  const clock = mock.clock(on)
-  on('session.start', ($, e) => e)
-  on('command.register', () => ({ value: undefined }))
-  on('ui.blit', () => ({ value: {} }))
-  await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true })
+  const clock = await startSession($, on)
 
   const ui = await $.ui.mount({ plugin: 'nyan-cat', surface: 'terminal', ...band(true) })
   await ui.redraw(band(false).props)
   expect(await ui.find({ key: 'nyan' })).toBeDefined()
 
-  await clock.advance(3000)
+  await clock.advance(5000)
   expect(await ui.find({ key: 'nyan' })).toBeUndefined()
   expect(await ui.find({ type: 'Text', text: /engine/ })).toBeDefined()
   await ui.unmount()

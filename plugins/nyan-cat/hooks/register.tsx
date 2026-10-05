@@ -161,7 +161,13 @@ function catHome(columns: number, sprite: Sprite): number {
   return Math.max(0, Math.floor((columns - sprite.width) / 2))
 }
 
-function frame(tick: number, columns: number, sprite: Sprite, offset = 0): string {
+// Cell rows of the sprite's full picture.
+function fullRows(sprite: Sprite): number {
+  return sprite.pixelRows / 2
+}
+
+// `visibleRows` crops the picture to its middle rows while the band opens and closes.
+function frame(tick: number, columns: number, sprite: Sprite, offset: number, visibleRows: number): string {
   const { pixelRows, bandHeight } = sprite
   const pixels = new Uint32Array(columns * pixelRows).fill(SKY)
   const put = (x: number, y: number, color: number) => {
@@ -208,14 +214,15 @@ function frame(tick: number, columns: number, sprite: Sprite, offset = 0): strin
     })
   }
 
-  const rows = pixelRows / 2
-  const cells = new Uint32Array(columns * rows * 3)
-  for (let row = 0; row < rows; row++) {
+  const top = Math.floor((fullRows(sprite) - visibleRows) / 2)
+  const cells = new Uint32Array(columns * visibleRows * 3)
+  for (let row = 0; row < visibleRows; row++) {
+    const pixelRow = (top + row) * 2
     for (let x = 0; x < columns; x++) {
       const at = (row * columns + x) * 3
       cells[at] = HALF_BLOCK
-      cells[at + 1] = pixels[row * 2 * columns + x] ?? SKY
-      cells[at + 2] = pixels[(row * 2 + 1) * columns + x] ?? SKY
+      cells[at + 1] = pixels[pixelRow * columns + x] ?? SKY
+      cells[at + 2] = pixels[(pixelRow + 1) * columns + x] ?? SKY
     }
   }
 
@@ -239,13 +246,16 @@ const USAGE = 'Usage: /nyan big | small | off | on (no argument toggles on/off)'
 export const register: Register = on => {
   let tick = 0
   // `offset` is how far the cat is from its centred home: negative while it flies in
-  // from the left, positive while it flies off to the right after the turn.
+  // from the left, positive while it flies off to the right after the turn. `rows` is
+  // how tall the band is drawn now: it opens a row per frame at the start and, once
+  // the cat is gone, closes a row per frame, so the transcript above never jumps.
   let mounted: {
     requestId: string
     columns: number
     sprite: Sprite
-    phase: 'arriving' | 'flying' | 'departing'
+    phase: 'arriving' | 'flying' | 'departing' | 'closing'
     offset: number
+    rows: number
   } | null = null
 
   on('session.start', async ($, e, next) => {
@@ -265,19 +275,33 @@ export const register: Register = on => {
       if (mounted === null) return
       tick += 1
       const home = catHome(mounted.columns, mounted.sprite)
+      const rowsBefore = mounted.rows
       if (mounted.phase === 'arriving') {
         mounted.offset = Math.min(0, mounted.offset + Math.ceil((home + mounted.sprite.width) / FLIGHT_FRAMES))
         if (mounted.offset === 0) mounted.phase = 'flying'
       } else if (mounted.phase === 'departing') {
         mounted.offset += Math.ceil((mounted.columns - home + TAIL_REACH) / FLIGHT_FRAMES)
-        if (home + mounted.offset - TAIL_REACH >= mounted.columns) {
-          mounted = null
-          $.ui.invalidate('ui.render')
-          return
-        }
+        if (home + mounted.offset - TAIL_REACH >= mounted.columns) mounted.phase = 'closing'
       }
-      const { requestId, columns, sprite, offset } = mounted
-      void $.ui.blit({ requestId, key: KEY, cells: frame(tick, columns, sprite, offset) })
+
+      if (mounted.phase === 'closing') {
+        mounted.rows -= 1
+      } else if (mounted.rows < fullRows(mounted.sprite)) {
+        mounted.rows += 1
+      }
+
+      if (mounted.rows <= 0) {
+        mounted = null
+        $.ui.invalidate('ui.render')
+        return
+      }
+      if (mounted.rows !== rowsBefore) {
+        // Another height is a new Raster, not a blit: draw the band again.
+        $.ui.invalidate('ui.render')
+        return
+      }
+      const { requestId, columns, sprite, offset, rows } = mounted
+      void $.ui.blit({ requestId, key: KEY, cells: frame(tick, columns, sprite, offset, rows) })
     })
 
     return next(e)
@@ -322,14 +346,27 @@ export const register: Register = on => {
     }
 
     const columns = Math.min(MAX_COLUMNS, e.props.bodyColumns)
-    // A turn starting (or one starting while the cat was flying off) brings it in from the left;
+    // A turn starting (or one starting while the cat was leaving) brings it in from the left;
     // a turn ending sends it off to the right; any other redraw keeps it where it is.
-    const startsFlight = e.props.isWorking && (mounted === null || mounted.phase === 'departing')
-    const phase = startsFlight ? 'arriving' : isDeparting ? 'departing' : (mounted?.phase ?? 'flying')
+    const isLeaving = mounted?.phase === 'departing' || mounted?.phase === 'closing'
+    const startsFlight = e.props.isWorking && (mounted === null || isLeaving)
+    const phase = startsFlight
+      ? 'arriving'
+      : isDeparting
+        ? mounted?.phase === 'closing' ? 'closing' : 'departing'
+        : (mounted?.phase ?? 'flying')
     const offset = startsFlight ? -(catHome(columns, sprite) + sprite.width) : (mounted?.offset ?? 0)
+    const visibleRows = Math.min(rows, mounted?.rows ?? 1)
     const { Raster } = $.ui.resolve(e)
-    mounted = { requestId: e.requestId, columns, sprite, phase, offset }
+    mounted = { requestId: e.requestId, columns, sprite, phase, offset, rows: visibleRows }
 
-    return <Raster key={KEY} columns={columns} rows={rows} cells={frame(tick, columns, sprite, offset)} />
+    return (
+      <Raster
+        key={KEY}
+        columns={columns}
+        rows={visibleRows}
+        cells={frame(tick, columns, sprite, offset, visibleRows)}
+      />
+    )
   })
 }
