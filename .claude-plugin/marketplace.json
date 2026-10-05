@@ -7,7 +7,7 @@
       "name": "nyan-cat",
       "source": "./plugins/nyan-cat",
       "description": "Nyan Cat flies with its rainbow above the prompt while Claude works.",
-      "version": "0.4.0"
+      "version": "0.5.0"
     }
   ]
 }
