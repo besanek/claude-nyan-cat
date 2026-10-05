@@ -93,3 +93,18 @@ test('when the turn ends the cat flies off, then the band clears', async ($, on)
   expect(await ui.find({ type: 'Text', text: /engine/ })).toBeDefined()
   await ui.unmount()
 })
+
+const FROSTING = 0xff99ff
+
+const colorsIn = (cells: string) => {
+  const bytes = Uint8Array.from(atob(cells), c => c.charCodeAt(0))
+  const words = new Uint32Array(bytes.buffer)
+  return new Set(words.filter((_, i) => i % 3 !== 0))
+}
+
+test('a new turn starts with the cat still off screen to the left', async $ => {
+  const ui = await $.ui.mount({ plugin: 'nyan-cat', surface: 'terminal', ...band(true) })
+  const raster = await ui.find({ key: 'nyan' })
+  expect(colorsIn(String(raster?.props.cells)).has(FROSTING)).toBe(false)
+  await ui.unmount()
+})

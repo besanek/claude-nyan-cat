@@ -10,8 +10,8 @@ const MAX_COLUMNS = 512
 // Each sprite's stars cover this many columns; wider bands repeat them.
 const STAR_TILE = 72
 const FRAME_MS = 90
-// Frames the fly-off takes once the turn ends, whatever the band's width (about 1.2 s).
-const DEPART_FRAMES = 14
+// Frames the fly-in and the fly-off take, whatever the band's width (about 1.2 s each).
+const FLIGHT_FRAMES = 14
 // The tail reaches this far left of the crust; the cat is gone once it clears the right edge.
 const TAIL_REACH = 5
 const KEY = 'nyan'
@@ -238,9 +238,15 @@ const USAGE = 'Usage: /nyan big | small | off | on (no argument toggles on/off)'
 
 export const register: Register = on => {
   let tick = 0
-  // `departure` is how far the cat has flown right since the turn ended; null while flying.
-  let mounted: { requestId: string; columns: number; sprite: Sprite; departure: number | null } | null =
-    null
+  // `offset` is how far the cat is from its centred home: negative while it flies in
+  // from the left, positive while it flies off to the right after the turn.
+  let mounted: {
+    requestId: string
+    columns: number
+    sprite: Sprite
+    phase: 'arriving' | 'flying' | 'departing'
+    offset: number
+  } | null = null
 
   on('session.start', async ($, e, next) => {
     const storedSize = await $.store.get('size')
@@ -258,17 +264,20 @@ export const register: Register = on => {
     $.clock.every(FRAME_MS, () => {
       if (mounted === null) return
       tick += 1
-      if (mounted.departure !== null) {
-        const distance = mounted.columns - catHome(mounted.columns, mounted.sprite) + TAIL_REACH
-        mounted.departure += Math.ceil(distance / DEPART_FRAMES)
-        if (catHome(mounted.columns, mounted.sprite) + mounted.departure - TAIL_REACH >= mounted.columns) {
+      const home = catHome(mounted.columns, mounted.sprite)
+      if (mounted.phase === 'arriving') {
+        mounted.offset = Math.min(0, mounted.offset + Math.ceil((home + mounted.sprite.width) / FLIGHT_FRAMES))
+        if (mounted.offset === 0) mounted.phase = 'flying'
+      } else if (mounted.phase === 'departing') {
+        mounted.offset += Math.ceil((mounted.columns - home + TAIL_REACH) / FLIGHT_FRAMES)
+        if (home + mounted.offset - TAIL_REACH >= mounted.columns) {
           mounted = null
           $.ui.invalidate('ui.render')
           return
         }
       }
-      const { requestId, columns, sprite, departure } = mounted
-      void $.ui.blit({ requestId, key: KEY, cells: frame(tick, columns, sprite, departure ?? 0) })
+      const { requestId, columns, sprite, offset } = mounted
+      void $.ui.blit({ requestId, key: KEY, cells: frame(tick, columns, sprite, offset) })
     })
 
     return next(e)
@@ -312,14 +321,15 @@ export const register: Register = on => {
       return <Text color="magenta">🌈🌈🌈 nyan nyan nyan 🐱</Text>
     }
 
-    // The turn ended while the cat was up: keep drawing so it can fly off to the right.
-    const departure = isDeparting ? (mounted?.departure ?? 0) : null
     const columns = Math.min(MAX_COLUMNS, e.props.bodyColumns)
+    // A turn starting (or one starting while the cat was flying off) brings it in from the left;
+    // a turn ending sends it off to the right; any other redraw keeps it where it is.
+    const startsFlight = e.props.isWorking && (mounted === null || mounted.phase === 'departing')
+    const phase = startsFlight ? 'arriving' : isDeparting ? 'departing' : (mounted?.phase ?? 'flying')
+    const offset = startsFlight ? -(catHome(columns, sprite) + sprite.width) : (mounted?.offset ?? 0)
     const { Raster } = $.ui.resolve(e)
-    mounted = { requestId: e.requestId, columns, sprite, departure }
+    mounted = { requestId: e.requestId, columns, sprite, phase, offset }
 
-    return (
-      <Raster key={KEY} columns={columns} rows={rows} cells={frame(tick, columns, sprite, departure ?? 0)} />
-    )
+    return <Raster key={KEY} columns={columns} rows={rows} cells={frame(tick, columns, sprite, offset)} />
   })
 }

@@ -25,7 +25,7 @@ Needs Claude Code 2.1.289 or newer (plugins with function hooks are early access
 | `/nyan on` | turns it back on at the last size |
 | `/nyan` | toggles on/off |
 
-The setting is kept across sessions. When Claude finishes, the cat flies off to the right.
+The setting is kept across sessions. The cat flies in from the left when Claude starts and off to the right when it finishes.
 
 `/nyan small` takes less room:
 
