@@ -45,7 +45,7 @@ test('/nyan off hides the cat and /nyan on brings it back', async ($, on) => {
   engineBand(on)
   mock.store(on)
   const off = await $.command.run({ command: 'nyan', args: 'off' })
-  expect(off.text).toContain('vypnuto')
+  expect(off.text).toContain('off')
 
   const hidden = await $.ui.mount({ plugin: 'nyan-cat', surface: 'terminal', ...band(true) })
   expect(await hidden.find({ key: 'nyan' })).toBeUndefined()
@@ -72,5 +72,5 @@ test('/nyan small and big switch the band height', async ($, on) => {
 
 test('/nyan with nonsense prints usage', async $ => {
   const result = await $.command.run({ command: 'nyan', args: 'purr' })
-  expect(result.text).toContain('Použití')
+  expect(result.text).toContain('Usage')
 })

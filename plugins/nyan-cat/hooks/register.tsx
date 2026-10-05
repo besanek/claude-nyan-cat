@@ -218,7 +218,7 @@ async function save($: EngineInterface, change: { size?: NyanSize; isOn?: boolea
   }
 }
 
-const USAGE = 'Použití: /nyan big | small | off | on (bez argumentu přepne zapnuto/vypnuto)'
+const USAGE = 'Usage: /nyan big | small | off | on (no argument toggles on/off)'
 
 export const register: Register = on => {
   let tick = 0
@@ -232,7 +232,7 @@ export const register: Register = on => {
 
     await $.command.register({
       name: COMMAND,
-      description: 'Nyan Cat: změní velikost nebo ho vypne',
+      description: 'Nyan Cat: change its size or turn it off',
       argumentHint: 'big | small | off | on',
       immediate: true,
     })
@@ -253,15 +253,15 @@ export const register: Register = on => {
 
     if (arg === 'big' || arg === 'small') {
       await save($, { size: arg, isOn: true })
-      return { text: arg === 'big' ? 'velká kočka (9 řádků)' : 'malá kočka (4 řádky)' }
+      return { text: arg === 'big' ? 'big cat (9 rows)' : 'small cat (4 rows)' }
     }
     if (arg === 'off' || (arg === '' && wasOn)) {
       await save($, { isOn: false })
-      return { text: 'vypnuto, zapneš přes /nyan on' }
+      return { text: 'off, turn it back on with /nyan on' }
     }
     if (arg === 'on' || arg === '') {
       await save($, { isOn: true })
-      return { text: `zapnuto (${(await read($, size)) === 'big' ? 'velká' : 'malá'} kočka)` }
+      return { text: `on (${await read($, size)} cat)` }
     }
 
     return { text: USAGE }
