@@ -171,7 +171,7 @@ function frame(tick: number, columns: number, sprite: Sprite): string {
   const catX = Math.max(0, Math.floor(columns * 0.65) - sprite.width)
   const bob = tick % 4 < 2 ? 0 : 1
 
-  for (let x = 0; x < catX + 2; x++) {
+  for (let x = 0; x < catX; x++) {
     const wave = Math.floor((x + tick) / 4) % 2
     RAINBOW.forEach((color, i) => {
       for (let dy = 0; dy < bandHeight; dy++) put(x, 1 + i * bandHeight + dy + wave, color)

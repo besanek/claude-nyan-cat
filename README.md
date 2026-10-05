@@ -2,6 +2,8 @@
 
 Nyan Cat for Claude Code: while Claude is working, a pixel-art Nyan Cat flies with its rainbow above the prompt.
 
+![Nyan Cat flying above the Claude Code prompt](docs/nyan-big.gif)
+
 ## Install
 
 In Claude Code:
@@ -24,6 +26,10 @@ Needs Claude Code 2.1.289 or newer (plugins with function hooks are early access
 | `/nyan` | toggles on/off |
 
 The setting is kept across sessions.
+
+`/nyan small` takes less room:
+
+![The small Nyan Cat](docs/nyan-small.gif)
 
 The animation is drawn in the terminal with half-block characters (2 pixels per row), in true color. The desktop app and VS Code show a single line of text instead.
 
