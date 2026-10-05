@@ -5,10 +5,13 @@ import type { NyanSize } from '../types'
 
 // Two pixel rows per cell: '▀' paints the top pixel as foreground, the bottom as background.
 const HALF_BLOCK = 0x2580
-const MAX_COLUMNS = 72
+// The widest Raster a surface takes; the band spans the window up to this.
+const MAX_COLUMNS = 512
+// Each sprite's stars cover this many columns; wider bands repeat them.
+const STAR_TILE = 72
 const FRAME_MS = 90
-// How far the whole picture slides right per frame once the turn ends.
-const DEPART_PIXELS = 4
+// Frames the fly-off takes once the turn ends, whatever the band's width (about 1.2 s).
+const DEPART_FRAMES = 14
 // The tail reaches this far left of the crust; the cat is gone once it clears the right edge.
 const TAIL_REACH = 5
 const KEY = 'nyan'
@@ -153,8 +156,9 @@ const SMALL: Sprite = {
 
 const SPRITES: Record<NyanSize, Sprite> = { big: BIG, small: SMALL }
 
+// Where the cat sits while flying: centred in the band.
 function catHome(columns: number, sprite: Sprite): number {
-  return Math.max(0, Math.floor(columns * 0.65) - sprite.width)
+  return Math.max(0, Math.floor((columns - sprite.width) / 2))
 }
 
 function frame(tick: number, columns: number, sprite: Sprite, offset = 0): string {
@@ -165,14 +169,18 @@ function frame(tick: number, columns: number, sprite: Sprite, offset = 0): strin
   }
 
   // Stars drift at half the frame rate and now and then glint with a faint cross.
-  for (const [sx, sy] of sprite.stars) {
-    const x = (((sx - Math.floor(tick / 2)) % columns) + columns) % columns
-    put(x, sy, STAR)
-    if ((Math.floor(tick / 2) + sx) % 10 === 0) {
-      put(x - 1, sy, STAR_GLOW)
-      put(x + 1, sy, STAR_GLOW)
-      put(x, sy - 1, STAR_GLOW)
-      put(x, sy + 1, STAR_GLOW)
+  for (let tile = 0; tile * STAR_TILE < columns; tile++) {
+    for (const [tx, sy] of sprite.stars) {
+      const sx = tx + tile * STAR_TILE
+      if (sx >= columns) continue
+      const x = (((sx - Math.floor(tick / 2)) % columns) + columns) % columns
+      put(x, sy, STAR)
+      if ((Math.floor(tick / 2) + sx) % 10 === 0) {
+        put(x - 1, sy, STAR_GLOW)
+        put(x + 1, sy, STAR_GLOW)
+        put(x, sy - 1, STAR_GLOW)
+        put(x, sy + 1, STAR_GLOW)
+      }
     }
   }
 
@@ -251,7 +259,8 @@ export const register: Register = on => {
       if (mounted === null) return
       tick += 1
       if (mounted.departure !== null) {
-        mounted.departure += DEPART_PIXELS
+        const distance = mounted.columns - catHome(mounted.columns, mounted.sprite) + TAIL_REACH
+        mounted.departure += Math.ceil(distance / DEPART_FRAMES)
         if (catHome(mounted.columns, mounted.sprite) + mounted.departure - TAIL_REACH >= mounted.columns) {
           mounted = null
           $.ui.invalidate('ui.render')

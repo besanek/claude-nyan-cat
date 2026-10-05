@@ -1,6 +1,6 @@
 {
   "name": "nyan-cat",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Nyan Cat flies with its rainbow above the prompt while Claude works. /nyan changes its size or turns it off.",
   "author": { "name": "Robert Jelen" },
   "homepage": "https://github.com/besanek/claude-nyan-cat",
