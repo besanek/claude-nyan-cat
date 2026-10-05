@@ -15,6 +15,16 @@ In Claude Code:
 
 Needs Claude Code 2.1.289 or newer (plugins with function hooks are early access).
 
+### Updates
+
+Third-party marketplaces don't auto-update by default. To get new versions automatically, open `/plugin` → **Marketplaces** → `claude-nyan-cat` and turn on **auto-update**. Otherwise update by hand:
+
+```
+claude plugin update nyan-cat@claude-nyan-cat
+```
+
+Then run `/reload-plugins` or start a new session.
+
 ## Usage
 
 | Command | What it does |
