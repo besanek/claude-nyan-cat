@@ -9,6 +9,8 @@ const MAX_COLUMNS = 72
 const FRAME_MS = 90
 // How far the whole picture slides right per frame once the turn ends.
 const DEPART_PIXELS = 4
+// The tail reaches this far left of the crust; the cat is gone once it clears the right edge.
+const TAIL_REACH = 5
 const KEY = 'nyan'
 const COMMAND = 'nyan'
 
@@ -151,6 +153,10 @@ const SMALL: Sprite = {
 
 const SPRITES: Record<NyanSize, Sprite> = { big: BIG, small: SMALL }
 
+function catHome(columns: number, sprite: Sprite): number {
+  return Math.max(0, Math.floor(columns * 0.65) - sprite.width)
+}
+
 function frame(tick: number, columns: number, sprite: Sprite, offset = 0): string {
   const { pixelRows, bandHeight } = sprite
   const pixels = new Uint32Array(columns * pixelRows).fill(SKY)
@@ -170,10 +176,10 @@ function frame(tick: number, columns: number, sprite: Sprite, offset = 0): strin
     }
   }
 
-  const catX = Math.max(0, Math.floor(columns * 0.65) - sprite.width) + offset
+  const catX = catHome(columns, sprite) + offset
   const bob = tick % 4 < 2 ? 0 : 1
 
-  for (let x = offset; x < catX; x++) {
+  for (let x = 0; x < catX; x++) {
     const wave = Math.floor((x + tick) / 4) % 2
     RAINBOW.forEach((color, i) => {
       for (let dy = 0; dy < bandHeight; dy++) put(x, 1 + i * bandHeight + dy + wave, color)
@@ -224,7 +230,7 @@ const USAGE = 'Usage: /nyan big | small | off | on (no argument toggles on/off)'
 
 export const register: Register = on => {
   let tick = 0
-  // `departure` is how far the picture has slid right since the turn ended; null while flying.
+  // `departure` is how far the cat has flown right since the turn ended; null while flying.
   let mounted: { requestId: string; columns: number; sprite: Sprite; departure: number | null } | null =
     null
 
@@ -246,7 +252,7 @@ export const register: Register = on => {
       tick += 1
       if (mounted.departure !== null) {
         mounted.departure += DEPART_PIXELS
-        if (mounted.departure >= mounted.columns) {
+        if (catHome(mounted.columns, mounted.sprite) + mounted.departure - TAIL_REACH >= mounted.columns) {
           mounted = null
           $.ui.invalidate('ui.render')
           return
