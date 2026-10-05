@@ -1,0 +1,13 @@
+{
+  "name": "claude-nyan-cat",
+  "description": "Nyan Cat mod for Claude Code.",
+  "owner": { "name": "Robert Jelen" },
+  "plugins": [
+    {
+      "name": "nyan-cat",
+      "source": "./plugins/nyan-cat",
+      "description": "Nyan Cat letí s duhou nad promptem, dokud Claude pracuje.",
+      "version": "0.2.0"
+    }
+  ]
+}

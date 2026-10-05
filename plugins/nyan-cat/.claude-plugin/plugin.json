@@ -1,0 +1,11 @@
+{
+  "name": "nyan-cat",
+  "version": "0.2.0",
+  "description": "Nyan Cat letí s duhou nad promptem, dokud Claude pracuje. /nyan mění velikost nebo ho vypne.",
+  "author": { "name": "Robert Jelen" },
+  "homepage": "https://github.com/besanek/claude-nyan-cat",
+  "repository": "https://github.com/besanek/claude-nyan-cat",
+  "license": "MIT",
+  "keywords": ["nyan-cat", "fun", "animation", "status"],
+  "types": "./types/index.d.ts"
+}
