@@ -7,6 +7,8 @@ import type { NyanSize } from '../types'
 const HALF_BLOCK = 0x2580
 const MAX_COLUMNS = 72
 const FRAME_MS = 90
+// How far the whole picture slides right per frame once the turn ends.
+const DEPART_PIXELS = 4
 const KEY = 'nyan'
 const COMMAND = 'nyan'
 
@@ -149,7 +151,7 @@ const SMALL: Sprite = {
 
 const SPRITES: Record<NyanSize, Sprite> = { big: BIG, small: SMALL }
 
-function frame(tick: number, columns: number, sprite: Sprite): string {
+function frame(tick: number, columns: number, sprite: Sprite, offset = 0): string {
   const { pixelRows, bandHeight } = sprite
   const pixels = new Uint32Array(columns * pixelRows).fill(SKY)
   const put = (x: number, y: number, color: number) => {
@@ -168,10 +170,10 @@ function frame(tick: number, columns: number, sprite: Sprite): string {
     }
   }
 
-  const catX = Math.max(0, Math.floor(columns * 0.65) - sprite.width)
+  const catX = Math.max(0, Math.floor(columns * 0.65) - sprite.width) + offset
   const bob = tick % 4 < 2 ? 0 : 1
 
-  for (let x = 0; x < catX; x++) {
+  for (let x = offset; x < catX; x++) {
     const wave = Math.floor((x + tick) / 4) % 2
     RAINBOW.forEach((color, i) => {
       for (let dy = 0; dy < bandHeight; dy++) put(x, 1 + i * bandHeight + dy + wave, color)
@@ -222,7 +224,9 @@ const USAGE = 'Usage: /nyan big | small | off | on (no argument toggles on/off)'
 
 export const register: Register = on => {
   let tick = 0
-  let mounted: { requestId: string; columns: number; sprite: Sprite } | null = null
+  // `departure` is how far the picture has slid right since the turn ended; null while flying.
+  let mounted: { requestId: string; columns: number; sprite: Sprite; departure: number | null } | null =
+    null
 
   on('session.start', async ($, e, next) => {
     const storedSize = await $.store.get('size')
@@ -240,8 +244,16 @@ export const register: Register = on => {
     $.clock.every(FRAME_MS, () => {
       if (mounted === null) return
       tick += 1
-      const { requestId, columns, sprite } = mounted
-      void $.ui.blit({ requestId, key: KEY, cells: frame(tick, columns, sprite) })
+      if (mounted.departure !== null) {
+        mounted.departure += DEPART_PIXELS
+        if (mounted.departure >= mounted.columns) {
+          mounted = null
+          $.ui.invalidate('ui.render')
+          return
+        }
+      }
+      const { requestId, columns, sprite, departure } = mounted
+      void $.ui.blit({ requestId, key: KEY, cells: frame(tick, columns, sprite, departure ?? 0) })
     })
 
     return next(e)
@@ -270,23 +282,29 @@ export const register: Register = on => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const sprite = SPRITES[await read($, size)]
     const rows = sprite.pixelRows / 2
-    const isShown = (await read($, isOn)) && e.props.isWorking && !e.props.hasSurvey
+    const canShow = (await read($, isOn)) && !e.props.hasSurvey && e.props.maxRows >= rows
+    const isDeparting = !e.props.isWorking && mounted !== null
 
-    if (!isShown || e.props.maxRows < rows) {
+    if (!canShow || (!e.props.isWorking && !isDeparting)) {
       mounted = null
       return next(e)
     }
 
     if (e.surface !== 'terminal') {
       mounted = null
+      if (!e.props.isWorking) return next(e)
       const { Text } = $.ui.resolve(e)
       return <Text color="magenta">🌈🌈🌈 nyan nyan nyan 🐱</Text>
     }
 
+    // The turn ended while the cat was up: keep drawing so it can fly off to the right.
+    const departure = isDeparting ? (mounted?.departure ?? 0) : null
     const columns = Math.min(MAX_COLUMNS, e.props.bodyColumns)
     const { Raster } = $.ui.resolve(e)
-    mounted = { requestId: e.requestId, columns, sprite }
+    mounted = { requestId: e.requestId, columns, sprite, departure }
 
-    return <Raster key={KEY} columns={columns} rows={rows} cells={frame(tick, columns, sprite)} />
+    return (
+      <Raster key={KEY} columns={columns} rows={rows} cells={frame(tick, columns, sprite, departure ?? 0)} />
+    )
   })
 }

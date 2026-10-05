@@ -74,3 +74,22 @@ test('/nyan with nonsense prints usage', async $ => {
   const result = await $.command.run({ command: 'nyan', args: 'purr' })
   expect(result.text).toContain('Usage')
 })
+
+test('when the turn ends the cat flies off, then the band clears', async ($, on) => {
+  engineBand(on)
+  mock.store(on)
+  const clock = mock.clock(on)
+  on('session.start', ($, e) => e)
+  on('command.register', () => ({ value: undefined }))
+  on('ui.blit', () => ({ value: {} }))
+  await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true })
+
+  const ui = await $.ui.mount({ plugin: 'nyan-cat', surface: 'terminal', ...band(true) })
+  await ui.redraw(band(false).props)
+  expect(await ui.find({ key: 'nyan' })).toBeDefined()
+
+  await clock.advance(3000)
+  expect(await ui.find({ key: 'nyan' })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: /engine/ })).toBeDefined()
+  await ui.unmount()
+})
