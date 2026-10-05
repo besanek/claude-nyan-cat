@@ -43,6 +43,14 @@ The setting is kept across sessions. The band opens a row at a time, the cat fli
 
 The animation is drawn in the terminal with half-block characters (2 pixels per row), in true color. The desktop app and VS Code show a single line of text instead.
 
+## Terminals
+
+The cat is drawn with half-block characters (`▀`) in true color, so it looks best in a terminal that draws block elements itself and supports 24-bit color: Ghostty, kitty, iTerm2, WezTerm, GNOME Terminal and Ptyxis all do.
+
+- **JetBrains IDEs** (IntelliJ, PhpStorm, …): with a line height above 1.0 you get dark stripes between rows. Set **Settings → Editor → Color Scheme → Console Font → Line height** to `1.0` and open a new terminal tab.
+- **Other terminals with stripes or gaps**: look for a line height or line spacing setting and set it to `1.0`.
+- **No true color** (e.g. macOS Terminal.app): colors come out approximated.
+
 ## Development
 
 ```
